@@ -1,0 +1,70 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: MarkRent-db
+    hostname: MarkRentdb
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=markrent
+    ports:
+      - "5432:5432"
+    networks:
+      - markrent-dev
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    command: ["postgres", "-c", "listen_addresses=*"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+    networks:
+      - markrent-dev
+  
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: always
+    ports:
+      - "15432:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    networks:
+      - markrent-dev
+
+  markrent.api:
+    container_name: MarkRent-api
+    environment: 
+      - ConnectionString=db
+    build:
+      context: .
+      dockerfile: MarkRent/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq: 
+        condition: service_started
+    ports:
+      - "5000:8080"
+    networks:
+      - markrent-dev
+
+networks:
+  markrent-dev:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+    driver: local
